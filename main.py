@@ -11,6 +11,8 @@ from urllib.parse import urlparse
 from ui import Console
 import ctypes
 import requests
+from telethon import functions
+import random
 
 console = Console()
 
@@ -304,60 +306,77 @@ class TelegramAdBot:
     async def join_groups(self):
         if not self.config['settings']['joiner']:
             return
-        for group in self.groups:
+        for group_url in self.groups:
             try:
-                parsed_url = urlparse(group)
-                group_name = parsed_url.path.strip('/')
-                await self.client(JoinChannelRequest(group_name))
-                console.success(f"Joined group {group_name}")
+                parsed_url = urlparse(group_url)
+                path_parts = parsed_url.path.strip('/').split('/')
+                group_name = path_parts[0]
+                try:
+                    await self.client(JoinChannelRequest(group_name))
+                    console.success(f"Joined group {group_name}")
+                    embed = create_embed(
+                        title="Joined Group",
+                        description=f"Successfully joined group {group_name}",
+                        color=0x00ff00,
+                        fields=[("Group Name", group_name, False)]
+                    )
+                    webhook_logs(embed)
+                    await asyncio.sleep(2)
+                except errors.ChannelInvalidError:
+                    console.error(f"Invalid group: {group_name}")
+                    embed = create_embed(
+                        title="Failed to Join Group",
+                        description=f"Invalid group: {group_name}",
+                        color=0xff0000,
+                        fields=[("Group Name", group_name, False)]
+                    )
+                    webhook_logs(embed)
+                except errors.ChannelPrivateError:
+                    console.error(f"Group is private: {group_name}")
+                    embed = create_embed(
+                        title="Failed to Join Group",
+                        description=f"Group is private: {group_name}",
+                        color=0xff0000,
+                        fields=[("Group Name", group_name, False)]
+                    )
+                    webhook_logs(embed)
+                except errors.UserBannedInChannelError:
+                    console.error(f"Banned from group: {group_name}")
+                    embed = create_embed(
+                        title="Failed to Join Group",
+                        description=f"Banned from group: {group_name}",
+                        color=0xff0000,
+                        fields=[("Group Name", group_name, False)]
+                    )
+                    webhook_logs(embed)
+                except errors.FloodWaitError as e:
+                    console.error(f"Rate-limited. Sleeping for {e.seconds} seconds")
+                    await asyncio.sleep(e.seconds)
+                    embed = create_embed(
+                        title="Rate Limited",
+                        description=f"Rate-limited. Sleeping for {e.seconds} seconds",
+                        color=0xff0000,
+                        fields=[("Group Name", group_name, False)]
+                    )
+                    webhook_logs(embed)
+                except errors.RPCError as e:
+                    console.error(f"Failed to join group {group_name}: {str(e)}")
+                    embed = create_embed(
+                        title="Failed to Join Group",
+                        description=f"Failed to join group {group_name}: {str(e)}",
+                        color=0xff0000,
+                        fields=[("Group Name", group_name, False)]
+                    )
+                    webhook_logs(embed)
+            except Exception as e:
+                console.error(f"Failed to process group URL {group_url}: {str(e)}")
                 embed = create_embed(
-                    title="Joined Group",
-                    description=f"Successfully joined group {group_name}",
-                    color=0x00ff00,
-                    fields=[("Group Name", group_name, False)]
+                    title="Failed to Process Group",
+                    description=f"Failed to process group URL {group_url}: {str(e)}",
+                    color=0xff0000,
+                    fields=[("Group URL", group_url, False)]
                 )
                 webhook_logs(embed)
-            except errors.ChannelInvalidError:
-                console.error(f"Invalid group: {group_name}")
-                embed = create_embed(
-                    title="Failed to Join Group",
-                    description=f"Invalid group: {group_name}",
-                    color=0xff0000,
-                    fields=[("Group Name", group_name, False)]
-                )
-            except errors.ChannelPrivateError:
-                console.error(f"Group is private: {group_name}")
-                embed = create_embed(
-                    title="Failed to Join Group",
-                    description=f"Group is private: {group_name}",
-                    color=0xff0000,
-                    fields=[("Group Name", group_name, False)]
-                )
-            except errors.UserBannedInChannelError:
-                console.error(f"Banned from group: {group_name}")
-                embed = create_embed(
-                    title="Failed to Join Group",
-                    description=f"Banned from group: {group_name}",
-                    color=0xff0000,
-                    fields=[("Group Name", group_name, False)]
-                )
-            except errors.FloodWaitError as e:
-                console.error(f"Rate-limited. Sleeping for {e.seconds} seconds.", group_name)
-                await asyncio.sleep(e.seconds)
-                embed = create_embed(
-                    title="Rate Limited",
-                    description=f"Rate-limited. Sleeping for {e.seconds} seconds.",
-                    color=0xff0000,
-                    fields=[("Group Name", group_name, False)]
-                )
-            except Exception as e:
-                console.error(f"Failed to join group {group_name}: {str(e)}")
-                embed = create_embed(
-                    title="Failed to Join Group",
-                    description=f"Failed to join group {group_name}: {str(e)}",
-                    color=0xff0000,
-                    fields=[("Group Name", group_name, False)]
-                )
 
     async def get_last_message_in_group(self, group):
         try:
@@ -449,13 +468,24 @@ class TelegramAdBot:
             forward_from_link = self.config['settings']['forward_from_group']
             forward_message_id = self.config['settings']['forward_message_id']
             message = await self.client.get_messages(forward_from_link, ids=int(forward_message_id))
+            if not message:
+                console.error(f"Could not find message with ID {forward_message_id} in {forward_from_link}")
+                return
         except Exception as e:
+            console.error(f"Failed to get message to forward: {str(e)}")
             return
         for group_url in self.groups:
             try:
                 parsed_url = urlparse(group_url)
                 path_parts = parsed_url.path.strip('/').split('/')
                 group_name = path_parts[0]
+                topic_id = None
+                if len(path_parts) > 1:
+                    try:
+                        topic_id = int(path_parts[1])
+                    except ValueError:
+                        console.error(f"Invalid topic ID in URL: {group_url}")
+                        continue
                 target_group_entity = await self.client.get_input_entity(group_name)
                 if self.config['settings']['skip_msg']:
                     last_message = await self.get_last_message_in_group(target_group_entity)
@@ -469,18 +499,28 @@ class TelegramAdBot:
                         )
                         webhook_logs(embed)
                         continue
-                await self.client.forward_messages(target_group_entity, message)
+                forwarded = await self.client(functions.messages.ForwardMessagesRequest(
+                    from_peer=await self.client.get_input_entity(forward_from_link),
+                    id=[message.id],
+                    to_peer=target_group_entity,
+                    top_msg_id=topic_id if topic_id else None,
+                    random_id=[random.randint(0, 2147483647)],
+                    drop_author=False,
+                    drop_media_captions=False
+                ))
                 messages_forwarded += 1
-                console.success(f"Message forwarded to {group_name}")
+                console.success(f"Message forwarded to {group_name}" + (f" topic {topic_id}" if topic_id else ""))
                 await asyncio.sleep(self.config['settings']['delay'])
                 embed = create_embed(
                     title="Message Forwarded",
-                    description=f"Message forwarded to {group_name}",
+                    description=f"Message forwarded to {group_name}" + (f" topic {topic_id}" if topic_id else ""),
                     color=0x00ff00,
                     fields=[("Group Name", group_name, False)]
                 )
+                webhook_logs(embed)
             except errors.SlowModeWaitError as e:
-                console.skip(f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.")
+                console.warning(f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.")
+                await asyncio.sleep(e.seconds + 1)
                 embed = create_embed(
                     title="Slow Mode",
                     description=f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.",
@@ -489,7 +529,8 @@ class TelegramAdBot:
                 )
                 webhook_logs(embed)
             except errors.FloodWaitError as e:
-                console.skip(f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.")
+                console.warning(f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.")
+                await asyncio.sleep(e.seconds + 1)
                 embed = create_embed(
                     title="Flood Wait",
                     description=f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.",
@@ -497,13 +538,22 @@ class TelegramAdBot:
                     fields=[("Group Name", group_name, False)]
                 )
                 webhook_logs(embed)
-            except ValueError:
-                console.error(f"Invalid group identifier in URL: {group_name}")
+            except errors.TopicDeletedError:
+                console.error(f"Topic is deleted in group {group_name}")
                 embed = create_embed(
-                    title="Invalid Group",
-                    description=f"Invalid group identifier in URL: {group_name}",
+                    title="Topic Deleted",
+                    description=f"Cannot send message to deleted topic in group {group_name}",
                     color=0xff0000,
                     fields=[("Group Name", group_name, False)]
+                )
+                webhook_logs(embed)
+            except ValueError as e:
+                console.error(f"Invalid group identifier in URL: {group_url}")
+                embed = create_embed(
+                    title="Invalid Group",
+                    description=f"Invalid group identifier in URL: {group_url}",
+                    color=0xff0000,
+                    fields=[("Group URL", group_url, False)]
                 )
                 webhook_logs(embed)
             except Exception as e:
@@ -514,6 +564,7 @@ class TelegramAdBot:
                     color=0xff0000,
                     fields=[("Group Name", group_name, False)]
                 )
+                webhook_logs(embed)
 
     async def handle_messages(self):
         global cycles_completed
