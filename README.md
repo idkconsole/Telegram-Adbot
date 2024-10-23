@@ -1,10 +1,19 @@
 **Telegram Ad Bot**
 
-*This Telegram bot automates message forwarding and custom message sending in multiple groups, featuring session management, group joining, and configuration-based control. Additionally, it logs important activities in a beautifully formatted Discord embed using a webhook.*
+*An advanced Telegram bot for automated message forwarding and custom message sending in multiple groups, featuring session management, forum topic support, group joining, and configuration-based control. Now with enhanced Discord webhook logging and improved error handling.*
 
 ![Telegram-Adbot](IMG_20240929_130632.png)
 ![Telegram-Adbot](IMG_20240929_131316.png)
 ![Telegram-Adbot](image-1.png)
+
+**Latest Updates (October 23, 2024)**
+
+*Added support for Telegram forum topics*
+*Improved message forwarding with proper attribution ("Forwarded from")*
+*Enhanced error handling for forum-related operations*
+*Fixed duplicate message sending in forum topics*
+*Improved rate limit handling and cooldown management*
+*Better session management and reconnection handling*
 
 **Features:**
 
