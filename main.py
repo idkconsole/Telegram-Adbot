@@ -423,7 +423,6 @@ class TelegramAdBot:
                 webhook_logs(embed)
             except errors.SlowModeWaitError as e:
                 console.warning(f"Skipping group {url} due to cooldown of {e.seconds} seconds.")
-                await asyncio.sleep(e.seconds + 1)
                 embed = create_embed(
                     title="Slow Mode",
                     description=f"Skipping group {url} due to cooldown of {e.seconds} seconds.",
@@ -433,7 +432,6 @@ class TelegramAdBot:
                 webhook_logs(embed)
             except errors.FloodWaitError as e:
                 console.warning(f"Skipping group {url} due to cooldown of {e.seconds} seconds.")
-                await asyncio.sleep(e.seconds + 1)
                 embed = create_embed(
                     title="Flood Wait",
                     description=f"Skipping group {url} due to cooldown of {e.seconds} seconds.",
@@ -520,7 +518,6 @@ class TelegramAdBot:
                 webhook_logs(embed)
             except errors.SlowModeWaitError as e:
                 console.warning(f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.")
-                await asyncio.sleep(e.seconds + 1)
                 embed = create_embed(
                     title="Slow Mode",
                     description=f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.",
@@ -530,7 +527,6 @@ class TelegramAdBot:
                 webhook_logs(embed)
             except errors.FloodWaitError as e:
                 console.warning(f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.")
-                await asyncio.sleep(e.seconds + 1)
                 embed = create_embed(
                     title="Flood Wait",
                     description=f"Skipping group {group_name} due to cooldown of {e.seconds} seconds.",
